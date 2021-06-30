@@ -10,7 +10,7 @@ var raycaster     // 模型
 var mouse = new THREE.Vector2()
 var position = new THREE.Vector3()
 var positionList = []
-var line
+var point
 var lines = []
 var isMove
 var isModel
@@ -18,7 +18,7 @@ var signLine      // 标识连线
 
 // gui
 var params = {
-
+    
 }
 
 function init() {
@@ -68,16 +68,10 @@ function init() {
     scene.add(light)
 
     // http://www.webgl3d.cn/threejs/docs/index.html#api/zh/core/BufferGeometry
-    var geometry = new THREE.BufferGeometry()
-    geometry.setFromPoints([new THREE.Vector3(), new THREE.Vector3()])
-    line = new THREE.Line(
-        geometry,
-        new THREE.LineBasicMaterial({ linewidth: 4 })
-    )
-    scene.add(line)
+    point = new THREE.Mesh(new THREE.SphereGeometry(0.2, 32, 32), new THREE.MeshBasicMaterial({ color: 0xff0000 }))
+    scene.add(point)
 
     // 导入模型
-    // loadLeePerrySmith()
     loadPatient()
 
     // http://www.webgl3d.cn/threejs/docs/index.html#api/zh/core/Raycaster
@@ -108,29 +102,6 @@ function init() {
 
     // 开始渲染
     animate()
-}
-
-function loadLeePerrySmith() {
-    var loader = new THREE.JSONLoader()
-    loader.load('models/leeperrysmith/LeePerrySmith.json', (geometry) => {
-        // http://www.webgl3d.cn/threejs/docs/index.html#api/zh/materials/MeshPhongMaterial
-        var material = new THREE.MeshPhongMaterial({
-            specular: 0x111111,
-            map: textureLoader.load('models/leeperrysmith/Map-COL.jpg'), // 贴图
-            specularMap: textureLoader.load(
-                // 镜面反射贴图
-                'models/leeperrysmith/Map-SPEC.jpg'
-            ),
-            normalMap: textureLoader.load(
-                // 法线贴图的纹理
-                'models/leeperrysmith/Infinite-Level_02_Tangent_SmoothUV.jpg'
-            ),
-            shininess: 25,
-        })
-        mesh = new THREE.Mesh(geometry, material)
-        scene.add(mesh)
-        mesh.scale.set(10, 10, 10)
-    })
 }
 
 function loadPatient() {
@@ -173,15 +144,7 @@ function checkIntersection() {
     var intersects = raycaster.intersectObjects([mesh], true) // 获取鼠标和模型的焦点
     if (intersects.length) {
         var p = intersects[0].point
-        var n = intersects[0].face.normal.clone()
-        // 更改标识线段
-        n.transformDirection(mesh.matrixWorld)
-        n.multiplyScalar(5)
-        n.add(intersects[0].point)
-        var _position = line.geometry.attributes.position
-        _position.setXYZ(0, p.x, p.y, p.z)
-        _position.setXYZ(1, n.x, n.y, n.z)
-        _position.needsUpdate = true
+        point.position.set(p.x, p.y, p.z)
         // 拷贝坐标
         position.copy(p)
         isModel = true
@@ -194,7 +157,7 @@ function handleConnect(e) {
     checkIntersection()
     if (!positionList[lines.length]) positionList[lines.length] = []
     positionList[lines.length].push(new THREE.Vector3().copy(position))
-    // 添加圆点
+    // 
     var geometry = new THREE.SphereGeometry(0.2, 32, 32)
     var material = new THREE.MeshBasicMaterial({ color: 0xff0000 })
     var sphere = new THREE.Mesh(geometry, material)
@@ -206,8 +169,18 @@ function handleConnect(e) {
         new THREE.BufferGeometry().setFromPoints(positionList[lines.length]),
         new THREE.LineBasicMaterial({ linewidth: 1 })
     )
+    // 
+    let distance = positionList[lines.length][0].distanceTo(positionList[lines.length][1])
+    let _position = new THREE.Vector3(
+        (positionList[lines.length][0].x + positionList[lines.length][1].x) / 2,
+        (positionList[lines.length][0].y + positionList[lines.length][1].y) / 2,
+        (positionList[lines.length][0].z + positionList[lines.length][1].z) / 2
+    )
+    // 创建射线
     lines.push(connect)
     scene.add(connect)
+    // 创建标签
+    createLabel(distance.toFixed(4), _position)
 }
 
 function animate() {
@@ -223,6 +196,16 @@ function onWindowResize() {
     camera.updateProjectionMatrix()
     renderer.setSize(window.innerWidth, window.innerHeight)
     labelRenderer.setSize(window.innerWidth, window.innerHeight)
+}
+
+// 创建2D标签
+function createLabel(text, position) {
+    const div = document.createElement('div')
+    div.className = 'label'
+    div.textContent = text
+    const divLabel = new THREE.CSS2DObject(div)
+    divLabel.position.set(position.x, position.y, position.z)
+    scene.add(divLabel)
 }
 
 window.addEventListener('load', init)
